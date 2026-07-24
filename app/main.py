@@ -6,6 +6,7 @@ from app.api.telegram import router as telegram_router
 from app.core.config import settings
 from app.services.telegram_client import telegram_client
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     webhook_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/telegram/webhook"

@@ -7,7 +7,6 @@ logger = logging.getLogger("bot.router")
 
 async def handle_update(update: dict) -> None:
     try:
-        
         message = update.get("message")
         if not message:
             return

@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class AppSettings(BaseSettings):
     ENVIRONMENT: str = Field(default="production")
-    
+
     TELEGRAM_BOT_TOKEN: str
     TELEGRAM_WEBHOOK_SECRET: str
     PUBLIC_BASE_URL: str
