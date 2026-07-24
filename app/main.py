@@ -11,6 +11,10 @@ from app.services.telegram_client import telegram_client
 async def lifespan(app: FastAPI):
     webhook_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/telegram/webhook"
     await telegram_client.set_webhook(webhook_url, settings.TELEGRAM_WEBHOOK_SECRET)
+    
+    yield
+
+    await telegram_client.delete_webhook() 
 
 
 def create_app() -> FastAPI:
