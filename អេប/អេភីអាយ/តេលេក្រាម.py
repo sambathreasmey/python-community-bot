@@ -2,20 +2,20 @@ import logging
 
 from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request, status
 
-from app.bot.router import handle_update
-from app.core.config import settings
+from អេប.បត.រ៉ោតទ័រ import handle_update
+from អេប.ស្នូល.កំណត់រចនាសម្ព័ន្ធ import កំណត់
 
-logger = logging.getLogger("telegram.webhook")
-router = APIRouter(prefix="/telegram", tags=["Telegram"])
+កាត់ត្រា_លុក = logging.getLogger("telegram.webhook")
+រ៉ោតទ័រ = APIRouter(prefix="/telegram", tags=["Telegram"])
 
 
-@router.post("/webhook", status_code=status.HTTP_200_OK)
+@រ៉ោតទ័រ.post("/webhook", status_code=status.HTTP_200_OK)
 async def telegram_webhook(
     request: Request,
     background_tasks: BackgroundTasks,
     x_telegram_bot_api_secret_token: str | None = Header(default=None),
 ):
-    if x_telegram_bot_api_secret_token != settings.TELEGRAM_WEBHOOK_SECRET:
+    if x_telegram_bot_api_secret_token != កំណត់.តេឡេក្រាម_គេហទំព័រ_សម្ងាត់:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid secret token"
         )
