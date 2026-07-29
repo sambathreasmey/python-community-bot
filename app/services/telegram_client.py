@@ -173,31 +173,43 @@ class TelegramClient:
         return response.json()
 
     async def delete_message_with_countdown(
-        self, chat_id: int, message_id: int, seconds: int
+        self, chat_id: int, user_message_id: int, seconds: int
     ) -> None:
-        """Edits the message every second to show a countdown, then deletes it."""
-        for remaining in range(seconds, 0, -1):
-            try:
+        """Sends a warning message, updates its countdown every second, then deletes both user & warning messages."""
+        warning_msg = None
+        try:
+            # 1. Bot sends its OWN warning message first
+            warning_msg = await self.send_message(
+                chat_id,
+                f"⚠️ Emojis are not allowed! Deleting in <b>{seconds}s</b>...",
+                parse_mode="HTML",
+            )
+            warning_msg_id = warning_msg["result"]["message_id"]
+
+            # 2. Edit the BOT'S message during the countdown
+            for remaining in range(seconds - 1, 0, -1):
+                await asyncio.sleep(1)
                 await self.edit_message_text(
                     chat_id,
-                    message_id,
-                    f"⚠️ Emojis are not allowed. This message will be deleted in <b>{remaining}s</b>.",
+                    warning_msg_id,
+                    f"⚠️ Emojis are not allowed! Deleting in <b>{remaining}s</b>...",
                 )
-            except httpx.HTTPError as exc:
-                logger.warning(
-                    "Failed to edit message %s in chat %s during countdown: %s",
-                    message_id,
-                    chat_id,
-                    exc,
-                )
+
             await asyncio.sleep(1)
 
+            # 3. Clean up the bot's warning message
+            await self.delete_message(chat_id, warning_msg_id)
+
+        except httpx.HTTPError as exc:
+            logger.warning("Error during countdown edit for chat %s: %s", chat_id, exc)
+
+        # 4. Delete the original user's message containing emoji
         try:
-            await self.delete_message(chat_id, message_id)
+            await self.delete_message(chat_id, user_message_id)
         except httpx.HTTPError as exc:
             logger.warning(
-                "Failed to delete message %s in chat %s: %s",
-                message_id,
+                "Failed to delete original user message %s in chat %s: %s",
+                user_message_id,
                 chat_id,
                 exc,
             )
