@@ -8,6 +8,10 @@ from app.core.config import settings
 
 logger = logging.getLogger("bot.telegram_client")
 
+# Dictionary to manage state per chat:
+# {chat_id: {"msg_id": int | None, "task": asyncio.Task | None}}
+_active_warning_tasks: dict[int, dict] = {}
+
 TELEGRAM_API_BASE = "https://api.telegram.org"
 
 
@@ -173,38 +177,11 @@ class TelegramClient:
         return response.json()
 
     async def delete_message_with_countdown(
-        self, chat_id: int, user_message_id: int, seconds: int
+        self, chat_id: int, user_message_id: int, seconds: int = 5
     ) -> None:
-        """Sends a warning message, updates its countdown every second, then deletes both user & warning messages."""
-        warning_msg = None
-        try:
-            # 1. Bot sends its OWN warning message first
-            warning_msg = await self.send_message(
-                chat_id,
-                f"⚠️ Emojis are not allowed! Deleting in <b>{seconds}s</b>...",
-                parse_mode="HTML",
-            )
-            warning_msg_id = warning_msg["result"]["message_id"]
+        """Deletes the user's emoji message immediately and manages a debounced warning countdown."""
 
-            # 2. Edit the BOT'S message during the countdown
-            for remaining in range(seconds - 1, 0, -1):
-                await asyncio.sleep(1)
-                await self.edit_message_text(
-                    chat_id,
-                    warning_msg_id,
-                    f"⚠️ Emojis are not allowed! Deleting in <b>{remaining}s</b>...",
-                    parse_mode="HTML",
-                )
-
-            await asyncio.sleep(1)
-
-            # 3. Clean up the bot's warning message
-            await self.delete_message(chat_id, warning_msg_id)
-
-        except httpx.HTTPError as exc:
-            logger.warning("Error during countdown edit for chat %s: %s", chat_id, exc)
-
-        # 4. Delete the original user's message containing emoji
+        # 1. Delete original user's message immediately
         try:
             await self.delete_message(chat_id, user_message_id)
         except httpx.HTTPError as exc:
@@ -214,6 +191,70 @@ class TelegramClient:
                 chat_id,
                 exc,
             )
+
+        # 2. Cancel any running warning task for this chat to avoid spam/rate limits
+        if chat_id in _active_warning_tasks and _active_warning_tasks[chat_id].get(
+            "task"
+        ):
+            _active_warning_tasks[chat_id]["task"].cancel()
+
+        # 3. Spawn a new countdown task in background
+        task = asyncio.create_task(self._run_warning_countdown(chat_id, seconds))
+
+        existing_msg_id = _active_warning_tasks.get(chat_id, {}).get("msg_id")
+        _active_warning_tasks[chat_id] = {
+            "msg_id": existing_msg_id,
+            "task": task,
+        }
+
+    async def _run_warning_countdown(self, chat_id: int, seconds: int) -> None:
+        """Internal helper to update or send the warning message and count down."""
+        warning_msg_id = _active_warning_tasks.get(chat_id, {}).get("msg_id")
+
+        try:
+            # If no active warning exists, send a new one
+            if not warning_msg_id:
+                warning_msg = await self.send_message(
+                    chat_id,
+                    f"⚠️ Emojis are not allowed! Deleting warning in <b>{seconds}s</b>...",
+                    parse_mode="HTML",
+                )
+                warning_msg_id = warning_msg["result"]["message_id"]
+                _active_warning_tasks[chat_id]["msg_id"] = warning_msg_id
+            else:
+                # Re-use existing warning message and reset countdown text
+                await self.edit_message_text(
+                    chat_id,
+                    warning_msg_id,
+                    f"⚠️ Emojis are not allowed! Deleting warning in <b>{seconds}s</b>...",
+                    parse_mode="HTML",
+                )
+
+            # Count down second by second
+            for remaining in range(seconds - 1, 0, -1):
+                await asyncio.sleep(1)
+                await self.edit_message_text(
+                    chat_id,
+                    warning_msg_id,
+                    f"⚠️ Emojis are not allowed! Deleting warning in <b>{remaining}s</b>...",
+                    parse_mode="HTML",
+                )
+
+            await asyncio.sleep(1)
+
+            # Clean up warning message once countdown reaches 0
+            await self.delete_message(chat_id, warning_msg_id)
+
+        except asyncio.CancelledError:
+            # Task was cancelled because another emoji message arrived; leave the warning message active
+            return
+        except httpx.HTTPError as exc:
+            logger.warning("Error during countdown edit for chat %s: %s", chat_id, exc)
+        finally:
+            # Clean up global tracking dictionary if this task completed naturally
+            current_task = asyncio.current_task()
+            if _active_warning_tasks.get(chat_id, {}).get("task") == current_task:
+                _active_warning_tasks.pop(chat_id, None)
 
     # ------------------------------------------------------------------
     # Callback queries
