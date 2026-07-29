@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Any
 
@@ -170,6 +171,36 @@ class TelegramClient:
         )
         response.raise_for_status()
         return response.json()
+
+    async def delete_message_with_countdown(
+        self, chat_id: int, message_id: int, seconds: int
+    ) -> None:
+        """Edits the message every second to show a countdown, then deletes it."""
+        for remaining in range(seconds, 0, -1):
+            try:
+                await self.edit_message_text(
+                    chat_id,
+                    message_id,
+                    f"⚠️ Emojis are not allowed. This message will be deleted in <b>{remaining}s</b>.",
+                )
+            except httpx.HTTPError as exc:
+                logger.warning(
+                    "Failed to edit message %s in chat %s during countdown: %s",
+                    message_id,
+                    chat_id,
+                    exc,
+                )
+            await asyncio.sleep(1)
+
+        try:
+            await self.delete_message(chat_id, message_id)
+        except httpx.HTTPError as exc:
+            logger.warning(
+                "Failed to delete message %s in chat %s: %s",
+                message_id,
+                chat_id,
+                exc,
+            )
 
     # ------------------------------------------------------------------
     # Callback queries
