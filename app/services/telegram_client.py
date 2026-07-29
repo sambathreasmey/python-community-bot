@@ -193,6 +193,7 @@ class TelegramClient:
                     chat_id,
                     warning_msg_id,
                     f"⚠️ Emojis are not allowed! Deleting in <b>{remaining}s</b>...",
+                    parse_mode="HTML",
                 )
 
             await asyncio.sleep(1)
