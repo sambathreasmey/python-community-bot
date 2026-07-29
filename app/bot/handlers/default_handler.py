@@ -13,7 +13,7 @@ async def handle_default_message(chat_id: int, message_id: int, text: str) -> No
             telegram_client.delete_message_with_countdown(
                 chat_id=chat_id, message_id=message_id, seconds=5
             )
-        ) 
+        )
         return
 
     if text == "/start":
