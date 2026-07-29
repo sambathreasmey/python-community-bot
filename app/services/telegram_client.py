@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from collections import defaultdict
 from typing import Any
 
 import httpx
@@ -8,9 +9,8 @@ from app.core.config import settings
 
 logger = logging.getLogger("bot.telegram_client")
 
-# Dictionary to manage state per chat:
-# {chat_id: {"msg_id": int | None, "task": asyncio.Task | None}}
 _active_warning_tasks: dict[int, dict] = {}
+_chat_locks: dict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
 
 TELEGRAM_API_BASE = "https://api.telegram.org"
 
@@ -192,22 +192,32 @@ class TelegramClient:
                 exc,
             )
 
-        # 2. Cancel any running warning task for this chat to avoid spam/rate limits
-        if chat_id in _active_warning_tasks and _active_warning_tasks[chat_id].get(
-            "task"
-        ):
-            _active_warning_tasks[chat_id]["task"].cancel()
+        lock = _chat_locks[chat_id]
 
-        # 3. Spawn a new countdown task in background
-        task = asyncio.create_task(self._run_warning_countdown(chat_id, seconds))
+        # 2 & 3. Atomically cancel the old countdown (if any) and start a new one.
+        async with lock:
+            old_task = _active_warning_tasks.get(chat_id, {}).get("task")
+            if old_task and not old_task.done():
+                old_task.cancel()
+                # Wait for it to actually stop before we touch shared state again,
+                # otherwise it can still be mid-edit when the new task starts.
+                try:
+                    await old_task
+                except asyncio.CancelledError:
+                    pass
 
-        existing_msg_id = _active_warning_tasks.get(chat_id, {}).get("msg_id")
-        _active_warning_tasks[chat_id] = {
-            "msg_id": existing_msg_id,
-            "task": task,
-        }
+            existing_msg_id = _active_warning_tasks.get(chat_id, {}).get("msg_id")
+            task = asyncio.create_task(
+                self._run_warning_countdown(chat_id, seconds, lock)
+            )
+            _active_warning_tasks[chat_id] = {
+                "msg_id": existing_msg_id,
+                "task": task,
+            }
 
-    async def _run_warning_countdown(self, chat_id: int, seconds: int) -> None:
+    async def _run_warning_countdown(
+        self, chat_id: int, seconds: int, lock: asyncio.Lock
+    ) -> None:
         """Internal helper to update or send the warning message and count down."""
         warning_msg_id = _active_warning_tasks.get(chat_id, {}).get("msg_id")
 
@@ -246,15 +256,22 @@ class TelegramClient:
             await self.delete_message(chat_id, warning_msg_id)
 
         except asyncio.CancelledError:
-            # Task was cancelled because another emoji message arrived; leave the warning message active
-            return
+            # Another emoji message arrived — leave the warning message alone,
+            # the caller (holding the lock) will take over. Re-raise so the
+            # awaiting caller knows cancellation actually completed.
+            raise
         except httpx.HTTPError as exc:
             logger.warning("Error during countdown edit for chat %s: %s", chat_id, exc)
-        finally:
-            # Clean up global tracking dictionary if this task completed naturally
-            current_task = asyncio.current_task()
-            if _active_warning_tasks.get(chat_id, {}).get("task") == current_task:
-                _active_warning_tasks.pop(chat_id, None)
+            async with lock:
+                current_task = asyncio.current_task()
+                if _active_warning_tasks.get(chat_id, {}).get("task") == current_task:
+                    _active_warning_tasks.pop(chat_id, None)
+        else:
+            # Completed naturally (countdown reached 0) — safe to clean up.
+            async with lock:
+                current_task = asyncio.current_task()
+                if _active_warning_tasks.get(chat_id, {}).get("task") == current_task:
+                    _active_warning_tasks.pop(chat_id, None)
 
     # ------------------------------------------------------------------
     # Callback queries
