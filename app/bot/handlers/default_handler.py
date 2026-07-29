@@ -8,11 +8,10 @@ from app.utils.otp import generate_otp
 
 async def handle_default_message(chat_id: int, message_id: int, text: str) -> None:
 
-    # Check for emojis
     if emoji.emoji_count(text) > 0:
         asyncio.create_task(
             telegram_client.delete_message_with_countdown(
-                chat_id, message_id, seconds=5
+                chat_id=chat_id, user_message_id=message_id, seconds=5
             )
         )
         return
