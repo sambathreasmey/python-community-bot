@@ -4,7 +4,7 @@ from app.utils.otp import generate_otp
 
 async def handle_default_message(chat_id: int, text: str) -> None:
     if text == "/start":
-        await telegram_client.send_message(chat_id, "👋 Welcome! b b")
+        await telegram_client.send_message(chat_id, "👋 សួស្ដី! កូនBot អ្នកគ្រូសុខេង។")
         return
     if text == "/otp":
         otp = generate_otp()
