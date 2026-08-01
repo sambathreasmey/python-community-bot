@@ -3,6 +3,7 @@ import random
 
 MODEL_PATH = "app/ai/chatbot_index.pkl"
 
+
 def load_index(model_path=MODEL_PATH):
     with open(model_path, "rb") as f:
         return pickle.load(f)
