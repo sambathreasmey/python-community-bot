@@ -7,7 +7,9 @@ from app.services.telegram_client import telegram_client
 from app.utils.otp import generate_otp
 
 
-async def handle_default_message(chat_id: int, message_id: int, text: str, request) -> None:
+async def handle_default_message(
+    chat_id: int, message_id: int, text: str, request
+) -> None:
 
     if emoji.emoji_count(text) > 0:
         asyncio.create_task(

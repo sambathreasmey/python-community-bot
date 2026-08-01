@@ -11,6 +11,7 @@ from app.services.telegram_client import telegram_client
 
 logger = logging.getLogger("bot.telegram_client")
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if os.path.exists(MODEL_PATH):
