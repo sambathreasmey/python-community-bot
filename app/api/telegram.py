@@ -26,5 +26,5 @@ async def telegram_webhook(
     # background_tasks.add_task(handle_update, update)
 
     update = await request.json()
-    await handle_update(update)
+    await handle_update(update, request)
     return {"ok": True}
