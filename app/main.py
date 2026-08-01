@@ -1,14 +1,21 @@
+import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, status
 
+from app.ai.chat_bot import MODEL_PATH, load_index
 from app.api.telegram import router as telegram_router
 from app.core.config import settings
 from app.services.telegram_client import telegram_client
 
+logger = logging.getLogger("bot.telegram_client")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if os.path.exists(MODEL_PATH):
+        app.state.chatbot_index = load_index()
+        logger.info("Loaded existing chatbot_index.pkl")
     webhook_url = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/telegram/webhook"
     await telegram_client.set_webhook(webhook_url, settings.TELEGRAM_WEBHOOK_SECRET)
     yield

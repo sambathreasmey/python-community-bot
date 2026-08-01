@@ -15,3 +15,6 @@ ruff>=0.3.0
 
 # Emoji
 emoji>=2.11.0
+
+# ML
+scikit-learn>=1.8.0

@@ -2,11 +2,12 @@ import asyncio
 
 import emoji
 
+from app.ai.chat_bot import get_response
 from app.services.telegram_client import telegram_client
 from app.utils.otp import generate_otp
 
 
-async def handle_default_message(chat_id: int, message_id: int, text: str) -> None:
+async def handle_default_message(chat_id: int, message_id: int, text: str, request) -> None:
 
     if emoji.emoji_count(text) > 0:
         asyncio.create_task(
@@ -25,3 +26,8 @@ async def handle_default_message(chat_id: int, message_id: int, text: str) -> No
             chat_id, f"Your OTP is : <code>{otp}</code>", parse_mode="HTML"
         )
         return
+
+    chatbot_index = request.app.state.chatbot_index
+    response_text, tag, similarity = get_response(text, chatbot_index)
+    print(tag, similarity)
+    await telegram_client.send_message(chat_id, response_text, parse_mode="HTML")
