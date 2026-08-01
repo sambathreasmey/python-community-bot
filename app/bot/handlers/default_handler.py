@@ -6,6 +6,8 @@ from app.ai.chat_bot import get_response
 from app.services.telegram_client import telegram_client
 from app.utils.otp import generate_otp
 
+BOT_USERNAME = "python_community_chat_bot"
+
 
 async def handle_default_message(
     chat_id: int, message_id: int, text: str, request
@@ -29,7 +31,10 @@ async def handle_default_message(
         )
         return
 
-    chatbot_index = request.app.state.chatbot_index
-    response_text, tag, similarity = get_response(text, chatbot_index)
-    print(tag, similarity)
-    await telegram_client.send_message(chat_id, response_text, parse_mode="HTML")
+    mention_tag = f"@{BOT_USERNAME}"
+    if mention_tag not in text:
+        cleaned_text = text.replace(mention_tag, "").strip()
+        chatbot_index = request.app.state.chatbot_index
+        response_text, tag, similarity = get_response(cleaned_text, chatbot_index)
+        print(tag, similarity)
+        await telegram_client.send_message(chat_id, response_text, parse_mode="HTML")
