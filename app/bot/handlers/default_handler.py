@@ -32,7 +32,7 @@ async def handle_default_message(
         return
 
     mention_tag = f"@{BOT_USERNAME}"
-    if mention_tag not in text:
+    if mention_tag in text:
         cleaned_text = text.replace(mention_tag, "").strip()
         chatbot_index = request.app.state.chatbot_index
         response_text, tag, similarity = get_response(cleaned_text, chatbot_index)
