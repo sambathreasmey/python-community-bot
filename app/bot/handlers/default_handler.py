@@ -5,6 +5,7 @@ import emoji
 from app.ai.chat_bot import get_response
 from app.services.telegram_client import telegram_client
 from app.utils.otp import generate_otp
+from app.utils.payroll import build_payroll_message
 
 BOT_USERNAME = "python_community_chat_bot"
 
@@ -28,6 +29,12 @@ async def handle_default_message(
         otp = generate_otp()
         await telegram_client.send_message(
             chat_id, f"Your OTP is : <code>{otp}</code>", parse_mode="HTML"
+        )
+        return
+    command = text.split(maxsplit=1)[0] if text else ""
+    if command in ("/payroll", f"/payroll@{BOT_USERNAME}"):
+        await telegram_client.send_message(
+            chat_id, build_payroll_message(), parse_mode="HTML"
         )
         return
 
