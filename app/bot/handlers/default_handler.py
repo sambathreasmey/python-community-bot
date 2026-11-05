@@ -1,6 +1,6 @@
 import asyncio
 
-import emoji
+# import emoji
 
 from app.ai.chat_bot import get_response
 from app.services.telegram_client import telegram_client
